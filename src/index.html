@@ -1393,10 +1393,11 @@
                     const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/);
                     const imgAlt = imgMatch[1];
                     const imgUrl = imgMatch[2];
+                    const path = "/Portfolio/src/assets/";
                     html += `
                         <div class="group relative w-full rounded-xl overflow-hidden">
                             <img 
-                                src="${imgUrl}" 
+                                src="${path + imgUrl}" 
                                 alt="${imgAlt}" 
                                 class="w-full h-auto max-h-[500px] object-contain transition-transform duration-300 group-hover:scale-[1.02]"
                             />
