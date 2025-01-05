@@ -23,4 +23,4 @@
 
 [03 - Общая презентация.pptx](https://drive.google.com/file/d/1Zeq8bM5RFDEGyTq6k-7RDOy-QFCUTN9H/view?usp=sharing)
 
-![Промо](../src/assets/9_1.png)
+![Промо](/src/assets/9_1.png)
