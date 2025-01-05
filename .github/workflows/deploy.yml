@@ -31,6 +31,7 @@ jobs:
           mkdir -p dist
           cp -r src/index.html dist/
           cp -r src/assets dist/
+          cp -r src/data dist/
         
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
