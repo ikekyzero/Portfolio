@@ -25,6 +25,11 @@ jobs:
       - name: Build
         run: npm run build
         
+      - name: Copy assets
+        run: |
+          mkdir -p src/assets
+          cp -r public/assets/* src/assets/
+        
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
