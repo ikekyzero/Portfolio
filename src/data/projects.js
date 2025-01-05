@@ -1,6 +1,6 @@
 export const projectsData = {
     'finding-woman': {
-        icon: '../assets/1.png',
+        icon: './assets/1.png',
         markdownPath: './data/projects/Находчивая женщина.md'
     },
     'jipto': {
