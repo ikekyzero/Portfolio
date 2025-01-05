@@ -5,7 +5,7 @@
   "main": "index.js",
   "homepage": "https://ikekyzero.github.io/Portfolio/",
   "scripts": {
-    "build": "tailwindcss -i src/input.css -o src/output.css --minify",
+    "build": "tailwindcss -i src/input.css -o dist/output.css --minify",
     "watch": "tailwindcss -i src/input.css -o src/output.css --watch",
     "start": "npm run build && live-server src"
   },

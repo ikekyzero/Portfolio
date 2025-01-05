@@ -29,7 +29,8 @@ jobs:
       - name: Copy index to root
         run: |
           mkdir -p dist
-          cp -r src/* dist/
+          cp -r src/index.html dist/
+          cp -r src/assets dist/
         
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
