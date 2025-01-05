@@ -7,7 +7,7 @@
 Формат Разработки: Моя Профессия IT 2021 (Городской этап)
 Ссылка на проект: https://drive.google.com/drive/u/1/folders/11AYWpfhHfwF_iyLsogWXznU4uBJ41kLn?usp=sharing
 
-![Постер](../public/assets/3_1.jpg)
+![Постер](../../src/assets/3_1.jpg)
 
 Постер
 
