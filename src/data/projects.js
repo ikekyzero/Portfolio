@@ -1,78 +1,78 @@
 export const projectsData = {
     'finding-woman': {
-        icon: '../public/assets/1.png',
+        icon: './assets/1.png',
         markdownPath: './data/projects/Находчивая женщина.md'
     },
     'jipto': {
-        icon: '../public/assets/2.png',
+        icon: './assets/2.png',
         markdownPath: './data/projects/ЖИПТО.md'
     },
     'happy-parent': {
-        icon: '../public/assets/7.jpg',
+        icon: './assets/7.jpg',
         markdownPath: './data/projects/HappyParent.md'
     },
     'quest-platformer': {
-        icon: '../public/assets/8.png',
+        icon: './assets/8.png',
         markdownPath: './data/projects/2D квест-платформер.md'
     },
     'aifhoc': {
-        icon: '../public/assets/20.jpg',
+        icon: './assets/20.jpg',
         markdownPath: './data/projects/AIFHOC.md'
     },
     'salemart': {
-        icon: '../public/assets/6.png',
+        icon: './assets/6.png',
         markdownPath: './data/projects/Salemart.md'
     },
     'sports-manager': {
-        icon: '../public/assets/14.jpg',
+        icon: './assets/14.jpg',
         markdownPath: './data/projects/Менеджер спортивных мероприятий.md'
     },
     'gravity-falls': {
-        icon: '../public/assets/11.png',
+        icon: './assets/11.png',
         markdownPath: './data/projects/Поиск предметов в мире Гравити Фолз.md'
     },
     'mytona-game': {
-        icon: '../public/assets/18.jpg',
+        icon: './assets/18.jpg',
         markdownPath: './data/projects/Игра во время стажировки в MYTONA.md'
     },
     'damn-terrarium': {
-        icon: '../public/assets/5.jpg',
+        icon: './assets/5.jpg',
         markdownPath: './data/projects/Damn Terrarium.md'
     },
     'go-help': {
-        icon: '../public/assets/9.jpg',
+        icon: './assets/9.jpg',
         markdownPath: './data/projects/GO HELP.md'
     },
     'legend-of-office': {
-        icon: '../public/assets/3.png',
+        icon: './assets/3.png',
         markdownPath: './data/projects/Legend of Office.md'
     },
     'the-companions': {
-        icon: '../public/assets/10.jpg',
+        icon: './assets/10.jpg',
         markdownPath: './data/projects/theCompanions.md'
     },
     'it-specialist': {
-        icon: '../public/assets/19.jpg',
+        icon: './assets/19.jpg',
         markdownPath: './data/projects/Айтишник.md'
     },
     'first-shooter': {
-        icon: '../public/assets/17.webp',
+        icon: './assets/17.webp',
         markdownPath: './data/projects/Мой первый шутер на Unity.md'
     },
     'steins-gate': {
-        icon: '../public/assets/16.gif',
+        icon: './assets/16.gif',
         markdownPath: './data/projects/Поймать вещи в антураже Steins;Gate.md'
     },
     'china-adventure': {
-        icon: '../public/assets/13.png',
+        icon: './assets/13.png',
         markdownPath: './data/projects/Приключения в Китае.md'
     },
     'movie-site': {
-        icon: '../public/assets/15.png',
+        icon: './assets/15.png',
         markdownPath: './data/projects/Сайт кинолент.md'
     },
     'jojo-fighting': {
-        icon: '../public/assets/12.webp',
+        icon: './assets/12.webp',
         markdownPath: './data/projects/Файтинг Джоджо.md'
     }
 };
