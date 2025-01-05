@@ -6,4 +6,4 @@
 Особенности: Back-end, Front-end
 Формат Разработки: Проект разрабатываемый менеджером
 
-![Salemart](../../src/assets/6_1.png)
+![Salemart](../src/assets/6_1.png)
