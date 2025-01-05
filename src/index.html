@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio</title>
+    <link href="output.css" rel="stylesheet">
+    <script type="module">
+        import { projectsData, longsData } from './data/projects.js';
+        
+        // Функция для конвертации markdown в HTML
+        function markdownToHTML(markdown) {
+            const lines = markdown.split('\n');
+            let html = '';
+            let inList = false;
+            let metadataHtml = '<div class="grid gap-4 mb-8 text-sm">';
+            let isMetadata = true;
+            let title = '';
+            
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                
+                // Пропускаем пустые строки
+                if (!trimmedLine) {
+                    if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                    }
+                    continue;
+                }
+                
+                // Метаданные (строки с ":")
+                if (isMetadata && line.includes(': ') && !line.includes('Видео:')) {
+                    // Проверяем, является ли это первой строкой с метаданными
+                    if (metadataHtml === '<div class="grid gap-4 mb-8 text-sm">') {
+                        // Если это первая строка и она не содержит ожидаемые ключи метаданных,
+                        // считаем что метаданных нет
+                        const key = line.split(':')[0].trim();
+                        const expectedKeys = ['Тип работы', 'Роль', 'Технология', 'Особенности', 'Формат Разработки', 'Ссылка на проект'];
+                        
+                        if (!expectedKeys.includes(key)) {
+                            isMetadata = false;
+                            metadataHtml = ''; // Очищаем метаданные
+                            // Обрабатываем строку как обычный текст
+                            html += `<p class="text-gray-600 dark:text-gray-300 mb-4">${line}</p>`;
+                            continue;
+                        }
+                    }
+
+                    const [key, value] = line.split(': ').map(s => s.trim());
+                    const colorClass = {
+                        'Тип работы': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                        'Роль': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+                        'Технология': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+                        'Особенности': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+                        'Формат Разработки': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                        'Ссылка на проект': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                    }[key] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+
+                    metadataHtml += `
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-gray-600 dark:text-gray-400 min-w-[140px]">${key}:</span>
+                            ${key === 'Ссылка на проект' 
+                                ? `<a href="${value}" target="_blank" class="px-2 py-1 rounded-md ${colorClass} hover:opacity-80 transition-opacity flex items-center gap-2">
+                                    <span class="truncate max-w-[300px]">${value}</span>
+                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                 </a>`
+                                : `<span class="px-2 py-1 rounded-md ${colorClass} break-all">${value}</span>`
+                            }
+                        </div>
+                    `;
+                    continue;
+                }
+                
+                // Блоки цитат (проверяем в первую очередь)
+                if (trimmedLine.startsWith('>')) {
+                    let quoteContent = [];
+                    let currentLine = line;
+                    
+                    // Собираем все параграфы цитаты
+                    while (currentLine && !currentLine.trim().match(/^>$/)) {
+                        if (currentLine.startsWith('>')) {
+                            quoteContent.push(currentLine.slice(1).trim());
+                        } else if (currentLine.trim()) {
+                            quoteContent.push(currentLine.trim());
+                        }
+                        const nextIndex = lines.indexOf(currentLine) + 1;
+                        currentLine = lines[nextIndex];
+                        if (nextIndex < lines.length) {
+                            lines.splice(nextIndex - 1, 1);
+                        }
+                    }
+                    
+                    html += `
+                        <blockquote class="relative my-8 pl-6 py-4">
+                            <div class="absolute top-0 left-0 w-1 h-full bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                            ${quoteContent.map(text => 
+                                `<p class="text-gray-600 dark:text-gray-300 mb-4 last:mb-0">${text}</p>`
+                            ).join('')}
+                        </blockquote>
+                    `;
+                    continue;
+                }
+                
+                // Заголовок H1
+                if (trimmedLine.startsWith('# ')) {
+                    title = `<h1 class="text-4xl font-bold text-gray-800 dark:text-white mb-6">${trimmedLine.slice(2)}</h1>`;
+                    continue;
+                }
+                
+                // Заголовок H2
+                if (trimmedLine.startsWith('## ')) {
+                    isMetadata = false;
+                    html += `
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mt-8 mb-4">
+                            ${trimmedLine.slice(3)}
+                        </h2>`;
+                    continue;
+                }
+                
+                // Aside блок
+                if (line.includes('<aside>')) {
+                    const content = line.replace('<aside>', '').replace('</aside>', '');
+                    const [emoji, ...text] = content.split(' ');
+                    html += `
+                        <div class="flex items-center gap-3 p-6 my-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                            <span class="text-2xl">${emoji}</span>
+                            <div class="flex-1">
+                                <p class="text-gray-600 dark:text-gray-300">${text.join(' ')}</p>
+                            </div>
+                        </div>`;
+                    continue;
+                }
+                
+                // Изображения
+                if (trimmedLine.match(/!\[.*?\]\(.*?\)/)) {
+                    // Если это первое изображение в группе, начинаем новую сетку
+                    if (!html.endsWith('</div>')) {
+                        html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">`;
+                    }
+
+                    const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/);
+                    const imgAlt = imgMatch[1];
+                    const imgUrl = imgMatch[2];
+                    html += `
+                        <div class="group relative w-full rounded-xl overflow-hidden">
+                            <img 
+                                src="${imgUrl}" 
+                                alt="${imgAlt}" 
+                                class="w-full h-auto max-h-[500px] object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+                            />
+                            <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/5 dark:to-black/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        </div>`;
+
+                    // Если следующая строка не содержит изображение, закрываем сетку
+                    const nextLine = lines[lines.indexOf(line) + 1];
+                    if (!nextLine || !nextLine.trim().match(/!\[.*?\]\(.*?\)/)) {
+                        html += '</div>';
+                    }
+                    continue;
+                }
+                
+                // Видео
+                if (line.includes('Видео:') || (trimmedLine.startsWith('[') && line.includes('youtu'))) {
+                    isMetadata = false;
+                    const videoUrl = line.includes('Видео:') 
+                        ? line.split('Видео:')[1].trim()
+                        : line.split('](')[1].slice(0, -1);
+                    
+                    const videoId = videoUrl.includes('youtu.be/') 
+                        ? videoUrl.split('youtu.be/')[1].split('?')[0].split('&')[0]
+                        : videoUrl.split('v=')[1]?.split('&')[0]?.split('?')[0];
+                    
+                    if (videoId) {
+                        html += `
+                            <div class="relative w-full max-w-2xl mx-auto my-8">
+                                <div class="relative pt-[56.25%] rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                                    <iframe 
+                                        class="absolute inset-0 w-full h-full"
+                                        src="https://www.youtube.com/embed/${videoId}"
+                                        title="YouTube video player"
+                                        frameborder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowfullscreen
+                                    ></iframe>
+                                </div>
+                                <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/5 dark:to-white/5 pointer-events-none rounded-lg"></div>
+                            </div>`;
+                    }
+                    continue;
+                }
+                
+                // Списки
+                if (trimmedLine.startsWith('- ')) {
+                    isMetadata = false;
+                    if (!inList) {
+                        html += '<ul class="space-y-1.5 my-4">';
+                        inList = true;
+                    }
+                    // Проверяем, является ли элемент списка ссылкой
+                    if (line.match(/\[.*?\]\(.*?\)/)) {
+                        const linkText = line.match(/\[(.*?)\]/)[1];
+                        const linkUrl = line.match(/\((.*?)\)/)[1];
+                        // Проверяем, является ли файл презентацией
+                        if (linkText.endsWith('.pptx') || linkText.endsWith('.ppt')) {
+                            html += `
+                                <li class="group flex items-center gap-3 py-1 px-2 text-gray-600 dark:text-gray-300 rounded-lg">
+                                    <span class="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
+                                    <div class="flex-1">
+                                        <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                            <div class="flex-shrink-0">
+                                                <svg class="w-8 h-8 text-red-500 dark:text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M19 3H5C3.89 3 3 3.89 3 5V19C3 20.11 3.89 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.89 20.11 3 19 3M19 19H5V5H19V19M10 12H8V17H10V12M14 8H12V17H14V8M18 14H16V17H18V14Z"/>
+                                                </svg>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">${linkText}</p>
+                                                <p class="text-sm text-gray-500 dark:text-gray-300">Презентация</p>
+                                            </div>
+                                            <a href="${linkUrl}" target="_blank" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-900 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600 dark:hover:text-white transition-colors">
+                                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path>
+                                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"></path>
+                                                </svg>
+                                                Открыть
+                                            </a>
+                                        </div>
+                                    </div>
+                                </li>`;
+                        } else {
+                            html += `
+                                <li class="group flex items-center gap-3 py-1 px-2 text-gray-600 dark:text-gray-300 rounded-lg">
+                                    <span class="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
+                                    <a href="${linkUrl}" target="_blank" class="px-2 py-1 rounded-md bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:opacity-80 transition-opacity flex items-center gap-2">
+                                        <span class="truncate max-w-[300px]">${linkText}</span>
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                    </a>
+                                </li>`;
+                        }
+                    } else {
+                        html += `
+                            <li class="group flex items-center gap-3 py-1 px-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                <span class="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full group-hover:bg-gray-500 dark:group-hover:bg-gray-400"></span>
+                                ${line.slice(2)}
+                            </li>`;
+                    }
+                    continue;
+                }
+                
+                // Обычный текст (если ничего другое не подошло)
+                if (trimmedLine && 
+                    !trimmedLine.match(/!\[.*?\]\(.*?\)/) && 
+                    !trimmedLine.match(/\[.*?\]\(.*?\)/) && 
+                    !trimmedLine.includes('Видео:') &&
+                    !trimmedLine.startsWith('- ') &&
+                    !trimmedLine.startsWith('>')) {
+                    isMetadata = false;
+                    html += `<p class="text-gray-600 dark:text-gray-300 mb-4">${line}</p>`;
+                } else if (line.match(/^\[.*?\]\(.*?\)/)) {
+                    // Обработка ссылок
+                    const linkText = line.match(/\[(.*?)\]/)[1];
+                    const linkUrl = line.match(/\((.*?)\)/)[1];
+                    
+                    // Проверяем, является ли файл презентацией
+                    if (linkText.endsWith('.pptx') || linkText.endsWith('.ppt')) {
+                        html += `
+                            <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg my-4">
+                                <div class="flex-shrink-0">
+                                    <svg class="w-8 h-8 text-red-500 dark:text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M19 3H5C3.89 3 3 3.89 3 5V19C3 20.11 3.89 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.89 20.11 3 19 3M19 19H5V5H19V19M10 12H8V17H10V12M14 8H12V17H14V8M18 14H16V17H18V14Z"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">${linkText}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-300">Презентация</p>
+                                </div>
+                                <a href="${linkUrl}" target="_blank" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-900 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600 dark:hover:text-white transition-colors">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path>
+                                        <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"></path>
+                                    </svg>
+                                    Открыть
+                                </a>
+                            </div>`;
+                    }
+                    continue;
+                }
+            }
+            
+            if (inList) html += '</ul>';
+            metadataHtml += '</div>';
+            return title + metadataHtml + html;
+        }
+        
+        // Функция для извлечения метаданных из markdown
+        function parseProjectMarkdown(markdown) {
+            const lines = markdown.split('\n');
+            const metadata = {};
+            let description = [];
+            let isMetadata = true;
+
+            for (const line of lines) {
+                if (line.startsWith('# ')) {
+                    metadata.title = line.slice(2);
+                }
+                else if (line.includes(': ') && isMetadata) {
+                    const [key, value] = line.split(': ');
+                    metadata[key.toLowerCase()] = value;
+                }
+                else if (line.trim() === '') {
+                    isMetadata = false;
+                }
+                else if (!isMetadata) {
+                    description.push(line);
+                }
+            }
+
+            metadata.description = description.join('\n');
+            return metadata;
+        }
+        
+        // Функция для показа проекта
+        async function showProject(projectId) {
+            const projectData = projectsData[projectId];
+            if (!projectData) return;
+            
+            // Загружаем markdown контент
+            const response = await fetch(projectData.markdownPath);
+            const markdown = await response.text();
+            
+            // Заполняем контент
+            document.getElementById('projectContent').innerHTML = markdownToHTML(markdown);
+            document.getElementById('projectIcon').src = projectData.icon;
+            
+            // Показываем модальное окно
+            document.getElementById('projectModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // Функция для закрытия проекта
+        function closeProject() {
+            document.getElementById('projectModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        
+        // Функция для показа статьи
+        async function showLong(longId) {
+            const longData = longsData[longId];
+            if (!longData) return;
+            
+            // Загружаем markdown контент
+            const response = await fetch(longData.markdownPath);
+            const markdown = await response.text();
+            
+            // Создаем модальное окно
+            const modalHtml = `
+                <div id="longModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                    <div class="flex items-center justify-center min-h-screen p-4">
+                        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" aria-hidden="true"></div>
+                        
+                        <div class="relative bg-white dark:bg-gray-800 rounded-xl max-w-4xl w-full p-6 overflow-hidden shadow-xl transform transition-all">
+                            <div class="absolute top-0 right-0 pt-4 pr-4">
+                                <button type="button" onclick="closeLong()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                    <span class="sr-only">Закрыть</span>
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <div class="mt-2 prose dark:prose-invert max-w-none">
+                                ${markdownToHTML(markdown)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // Функция для закрытия статьи
+        function closeLong() {
+            const modal = document.getElementById('longModal');
+            if (modal) {
+                modal.remove();
+                document.body.style.overflow = '';
+            }
+        }
+        
+        // Делаем функции доступными глобально
+        window.showProject = showProject;
+        window.closeProject = closeProject;
+        window.showLong = showLong;
+        window.closeLong = closeLong;
+    </script>
+    <script>
+        // Проверяем сохраненную тему
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+        
+        // Функция переключения темы
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        }
+        window.toggleTheme = toggleTheme;
+        
+        // Функция копирования в буфер обмена
+        async function copyToClipboard(text, message) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const notification = document.getElementById('notification');
+                const notificationText = document.getElementById('notification-text');
+                notificationText.textContent = message;
+                
+                // Показываем уведомление
+                notification.classList.remove('opacity-0');
+                notification.classList.add('translate-y-4');
+                
+                // Скрываем через 2 секунды
+                setTimeout(() => {
+                    notification.classList.add('opacity-0');
+                    notification.classList.remove('translate-y-4');
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                // Показываем уведомление об ошибке
+                const notification = document.getElementById('notification');
+                const notificationText = document.getElementById('notification-text');
+                notification.classList.remove('bg-green-500');
+                notification.classList.add('bg-red-500');
+                notificationText.textContent = 'Не удалось скопировать текст';
+                
+                notification.classList.remove('opacity-0');
+                notification.classList.add('translate-y-4');
+                
+                setTimeout(() => {
+                    notification.classList.add('opacity-0');
+                    notification.classList.remove('translate-y-4');
+                    // Возвращаем зеленый цвет
+                    setTimeout(() => {
+                        notification.classList.remove('bg-red-500');
+                        notification.classList.add('bg-green-500');
+                    }, 300);
+                }, 2000);
+            }
+        }
+        window.copyToClipboard = copyToClipboard;
+    </script>
+</head>
+<body class="bg-customGray dark:bg-gray-900 min-h-screen flex items-center justify-center relative">
+    <!-- Уведомление -->
+    <div id="notification" class="fixed top-4 left-1/2 transform -translate-x-1/2 -translate-y-full bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg opacity-0 transition-all duration-300 flex items-center z-50">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <span id="notification-text"></span>
+    </div>
+
+    <!-- Добавляем видео-фон -->
+    <video 
+        autoplay 
+        loop 
+        muted 
+        playsinline
+        class="fixed top-0 left-0 min-w-full min-h-full w-full h-full object-cover -z-10"
+    >
+        <source src="./assets/background-main.webm" type="video/webm">
+    </video>
+
+    <!-- Добавляем полупрозрачный оверлей для лучшей читаемости контента -->
+    <div class="fixed top-0 left-0 w-full h-full bg-black/30 -z-10"></div>
+
+    <!-- Добавляем кнопку переключения темы -->
+    <button 
+        onclick="toggleTheme()"
+        class="fixed top-4 right-4 p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white z-40 hidden md:block"
+    >
+        <svg class="w-6 h-6 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- иконка солнца -->
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <svg class="w-6 h-6 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- иконка луны -->
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+    </button>
+
+    <!-- Общие классы -->
+    <script>
+        const baseCard = "bg-white dark:bg-gray-800 rounded-3xl shadow-lg p-6 transition-shadow hover:shadow-xl";
+        const baseText = "text-gray-600 dark:text-white";
+        const baseHeading = "text-gray-800 dark:text-white font-bold";
+    </script>
+
+    <!-- Основной контейнер -->
+    <div class="w-full max-w-3xl">
+        <!-- Раздел с задним фоном и аватаркой -->
+        <div class="relative bg-white dark:bg-gray-800/90 rounded-3xl shadow-xl">
+            <div class="relative">
+                <!-- Фоновое видео -->
+                <video 
+                    src="./assets/background_9.mp4" 
+                    autoplay 
+                    loop 
+                    playsinline 
+                    muted 
+                    class="w-full h-44 object-cover"
+                    style="object-position: top -50px right 0"
+                ></video>
+                <!-- Аватар -->
+                <div class="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                    <video 
+                        src="./assets/avatar.mp4"
+                        autoplay 
+                        loop 
+                        playsinline 
+                        muted 
+                        class="w-20 h-20 rounded-full border-4 border-white dark:border-gray-800 object-cover"
+                    ></video>
+                </div>
+            </div>
+            <!-- Раздел с профилем -->
+            <div class="text-center mt-9 px-6 pb-6">
+                <!-- Имя профиля -->
+                <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Торговкин Андрей</h1>
+                <!-- Профессия -->
+                <p class="text-lg text-gray-500 dark:text-white">Программист</p>
+                <!-- Кнопка подписки -->
+                <button class="mt-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-8 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-shadow">
+                    Нанять меня
+                </button>
+            </div>
+        </div>
+
+        <!-- Новые секции -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+            <!-- О себе и навыки -->
+            <div class="bg-white dark:bg-gray-800/90 rounded-3xl shadow-lg p-6 transition-shadow hover:shadow-xl">
+                <section id="about" class="mb-8">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Обо мне</h2>
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-2">
+                            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-gray-600 dark:text-white">21 год (14 октября 2003)</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span class="text-gray-600 dark:text-white">Живу в Якутск</span>
+                        </div>
+                        <p class="text-gray-600 dark:text-white">Я разработчик с опытом в создании веб-приложений и игр. Увлекаюсь новыми технологиями и постоянно изучаю что-то новое.</p>
+                    </div>
+                </section>
+
+                <section id="hobbies">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Хобби</h2>
+                    <ul class="list-disc pl-5 text-gray-600 dark:text-white">
+                        <li>Разработка игр</li>
+                        <li>Создание программ и сайтов</li>
+                        <li>Изучение новых технологий</li>
+                    </ul>
+                </section>
+            </div>
+
+            <!-- Контакты и хобби -->
+            <div class="bg-white dark:bg-gray-800/90 rounded-3xl shadow-lg p-6 transition-shadow hover:shadow-xl">
+                <section id="contact" class="mb-8">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Контакты</h2>
+                    <div class="space-y-3">
+                        <!-- Телефон -->
+                        <button 
+                            onclick="copyToClipboard('+79644213812', 'Номер телефона скопирован')" 
+                            class="w-full flex items-center text-gray-600 dark:text-white hover:text-blue-500 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all group"
+                        >
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                            </svg>
+                            +7 (964) 421-38-12
+                            <svg class="w-5 h-5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+
+                        <!-- Email -->
+                        <button 
+                            onclick="copyToClipboard('andrew.rudakov2003@gmail.com', 'Email скопирован')" 
+                            class="w-full flex items-center text-gray-600 dark:text-white hover:text-blue-500 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all group"
+                        >
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            andrew.rudakov2003@gmail.com
+                            <svg class="w-5 h-5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+
+                        <!-- GitHub -->
+                        <a href="https://github.com/ikekyzero" target="_blank" class="flex items-center text-gray-600 dark:text-white hover:text-blue-500 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all">
+                            <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                            GitHub
+                        </a>
+                        <a href="https://yakutsk.hh.ru/resume/a070389bff0d30e1760039ed1f4b5371503558" target="_blank" class="flex items-center text-gray-600 dark:text-white hover:text-blue-500 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all">
+                            <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 300 300">
+                                <g transform="translate(0.000000,300.000000) scale(0.050000,-0.050000)">
+                                    <path d="M2650 5977 c-2078 -230 -3291 -2567 -2285 -4402 1145 -2086 4125 -2086 5270 0 1157 2108 -579 4668 -2985 4402z m-950 -2018 l0 -502 86 71 c356 291 867 213 1038 -158 45 -98 46 -116 52 -845 l7 -745 -251 0 -250 0 -6 685 c-7 762 -6 757 -145 823 -173 82 -380 5 -478 -178 -41 -76 -43 -111 -49 -705 l-7 -625 -248 0 -249 0 0 1340 0 1340 250 0 250 0 0 -501z m1920 -1 l0 -501 83 71 c278 238 749 228 954 -21 126 -153 130 -182 138 -992 l8 -735 -251 0 -250 0 -6 676 c-5 612 -9 681 -42 731 -157 240 -543 134 -612 -167 -12 -51 -21 -343 -22 -665 l0 -575 -250 0 -250 0 0 1340 0 1340 250 0 250 0 0 -502z"/>
+                                </g>
+                            </svg>
+                            HeadHunter
+                        </a>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Раздел с языками программирования и проектами -->
+        <div class="relative p-6 bg-white dark:bg-gray-800/90 rounded-3xl shadow-xl mt-2">
+            <div class="space-y-8">
+                <!-- Языки программирования -->
+                <div>
+                    <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Языки программирования, которые я знаю</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <!-- Python -->
+                        <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                            <div class="w-10 h-10 flex items-center justify-center bg-blue-100 dark:bg-blue-800 rounded-lg">
+                                <svg class="w-10 h-10" viewBox="0 0 64 64" fill="none">
+                                    <path d="M31.885 16c-8.124 0-7.617 3.523-7.617 3.523l.01 3.65h7.752v1.095H21.197S16 23.678 16 31.876c0 8.196 4.537 7.906 4.537 7.906h2.708v-3.804s-.146-4.537 4.465-4.537h7.688s4.32.07 4.32-4.175v-7.019S40.374 16 31.885 16zm-4.275 2.454c.771 0 1.395.624 1.395 1.395s-.624 1.395-1.395 1.395a1.393 1.393 0 0 1-1.395-1.395c0-.771.624-1.395 1.395-1.395z" fill="url(#a)"/>
+                                    <path d="M32.115 47.833c8.124 0 7.617-3.523 7.617-3.523l-.01-3.65H31.97v-1.095h10.832S48 40.155 48 31.958c0-8.197-4.537-7.906-4.537-7.906h-2.708v3.803s.146 4.537-4.465 4.537h-7.688s-4.32-.07-4.32 4.175v7.019s-.656 4.247 7.833 4.247zm4.275-2.454a1.393 1.393 0 0 1-1.395-1.395c0-.77.624-1.394 1.395-1.394s1.395.623 1.395 1.394c0 .772-.624 1.395-1.395 1.395z" fill="url(#b)"/>
+                                    <defs>
+                                        <linearGradient id="a" x1="19.075" y1="18.782" x2="34.898" y2="34.658" gradientUnits="userSpaceOnUse">
+                                            <stop stop-color="#387EB8"/>
+                                            <stop offset="1" stop-color="#366994"/>
+                                        </linearGradient>
+                                        <linearGradient id="b" x1="28.809" y1="28.882" x2="45.803" y2="45.163" gradientUnits="userSpaceOnUse">
+                                            <stop stop-color="#FFE052"/>
+                                            <stop offset="1" stop-color="#FFC331"/>
+                                        </linearGradient>
+                                    </defs>
+                                 </svg>
+                             </div>
+                             <div>
+                                 <p class="font-semibold text-gray-900 dark:text-white">Python</p>
+                                 <p class="text-sm text-gray-600 dark:text-gray-300">Основной язык</p>
+                             </div>
+                         </div>
+                        
+                        <div class="flex items-center gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                            <div class="w-10 h-10 flex items-center justify-center bg-yellow-100 dark:bg-yellow-800 rounded-lg">
+                                <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-300" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-900 dark:text-white">JavaScript</p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">Frontend & Node.js</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
+                            <div class="w-10 h-10 flex items-center justify-center bg-purple-100 dark:bg-purple-800 rounded-lg">
+                                <svg class="w-6 h-6 text-purple-600 dark:text-purple-300" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 256 288" version="1.1" preserveAspectRatio="xMidYMid">
+                                    <g>
+                                        <path d="M255.569,84.452376 C255.567,79.622376 254.534,75.354376 252.445,71.691376 C250.393,68.089376 247.32,65.070376 243.198,62.683376 C209.173,43.064376 175.115,23.505376 141.101,3.86637605 C131.931,-1.42762395 123.04,-1.23462395 113.938,4.13537605 C100.395,12.122376 32.59,50.969376 12.385,62.672376 C4.064,67.489376 0.015,74.861376 0.013,84.443376 C0,123.898376 0.013,163.352376 0,202.808376 C0,207.532376 0.991,211.717376 2.988,215.325376 C5.041,219.036376 8.157,222.138376 12.374,224.579376 C32.58,236.282376 100.394,275.126376 113.934,283.115376 C123.04,288.488376 131.931,288.680376 141.104,283.384376 C175.119,263.744376 209.179,244.186376 243.209,224.567376 C247.426,222.127376 250.542,219.023376 252.595,215.315376 C254.589,211.707376 255.582,207.522376 255.582,202.797376 C255.582,202.797376 255.582,123.908376 255.569,84.452376" fill="#A179DC" fill-rule="nonzero"/>
+                                        <path d="M128.182,143.241376 L2.988,215.325376 C5.041,219.036376 8.157,222.138376 12.374,224.579376 C32.58,236.282376 100.394,275.126376 113.934,283.115376 C123.04,288.488376 131.931,288.680376 141.104,283.384376 C175.119,263.744376 209.179,244.186376 243.209,224.567376 C247.426,222.127376 250.542,219.023376 252.595,215.315376 L128.182,143.241376" fill="#280068" fill-rule="nonzero"/>
+                                        <path d="M255.569,84.452376 C255.567,79.622376 254.534,75.354376 252.445,71.691376 L128.182,143.241376 L252.595,215.315376 C254.589,211.707376 255.58,207.522376 255.582,202.797376 C255.582,202.797376 255.582,123.908376 255.569,84.452376" fill="#390091" fill-rule="nonzero"/>
+                                        <path d="M201.892326,116.294008 L201.892326,129.767692 L215.36601,129.767692 L215.36601,116.294008 L222.102852,116.294008 L222.102852,129.767692 L235.576537,129.767692 L235.576537,136.504534 L222.102852,136.504534 L222.102852,149.978218 L235.576537,149.978218 L235.576537,156.71506 L222.102852,156.71506 L222.102852,170.188744 L215.36601,170.188744 L215.36601,156.71506 L201.892326,156.71506 L201.892326,170.188744 L195.155484,170.188744 L195.155484,156.71506 L181.6818,156.71506 L181.6818,149.978218 L195.155484,149.978218 L195.155484,136.504534 L181.6818,136.504534 L181.6818,129.767692 L195.155484,129.767692 L195.155484,116.294008 L201.892326,116.294008 Z M215.36601,136.504534 L201.892326,136.504534 L201.892326,149.978218 L215.36601,149.978218 L215.36601,136.504534 Z" fill="#FFFFFF"/>
+                                        <path d="M128.456752,48.625876 C163.600523,48.625876 194.283885,67.7121741 210.718562,96.0819435 L210.558192,95.808876 L169.209615,119.617159 C161.062959,105.823554 146.128136,96.5150717 128.996383,96.3233722 L128.456752,96.3203544 C102.331178,96.3203544 81.1506705,117.499743 81.1506705,143.625316 C81.1506705,152.168931 83.4284453,160.17752 87.3896469,167.094792 C95.543745,181.330045 110.872554,190.931398 128.456752,190.931398 C146.149522,190.931398 161.565636,181.208041 169.67832,166.820563 L169.481192,167.165876 L210.767678,191.083913 C194.51328,219.21347 164.25027,238.240861 129.514977,238.620102 L128.456752,238.625876 C93.2021701,238.625876 62.4315028,219.422052 46.0382398,190.902296 C38.0352471,176.979327 33.4561922,160.837907 33.4561922,143.625316 C33.4561922,91.1592636 75.9884604,48.625876 128.456752,48.625876 Z" fill="#FFFFFF" fill-rule="nonzero"/>
+                                    </g>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-900 dark:text-white">C#</p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">Unity & .NET</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                            <div class="w-10 h-10 flex items-center justify-center bg-blue-100 dark:bg-blue-800 rounded-lg">
+                                <svg class="w-6 h-6 text-blue-600 dark:text-blue-300" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M22.394 6c-.167-.29-.398-.543-.652-.69L12.926.22c-.509-.294-1.34-.294-1.848 0L2.26 5.31c-.508.293-.923 1.013-.923 1.6v10.18c0 .294.104.62.271.91.167.29.398.543.652.69l8.816 5.09c.508.293 1.34.293 1.848 0l8.816-5.09c.254-.147.485-.4.652-.69.167-.29.27-.616.27-.91V6.91c.003-.294-.1-.62-.268-.91zM12 19.11c-3.92 0-7.109-3.19-7.109-7.11 0-3.92 3.19-7.11 7.11-7.11a7.133 7.133 0 016.156 3.553l-3.076 1.78a3.567 3.567 0 00-3.08-1.78A3.56 3.56 0 008.444 12 3.56 3.56 0 0012 15.555a3.57 3.57 0 003.08-1.778l3.078 1.78A7.135 7.135 0 0112 19.11zm7.11-6.715h-.79v.79h-.79v-.79h-.79v-.79h.79v-.79h.79v.79h.79zm2.962 0h-.79v.79h-.79v-.79h-.79v-.79h.79v-.79h.79v.79h.79z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-900 dark:text-white">C++</p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">Unreal Engine</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3 p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+                            <div class="w-10 h-10 flex items-center justify-center bg-indigo-100 dark:bg-indigo-800 rounded-lg">
+                                <svg class="w-6 h-6" viewBox="0 0 32 32" fill="none">
+                                    <circle cx="16" cy="16" r="14" fill="#8892BF"/>
+                                    <path d="M14.4392 10H16.1192L15.6444 12.5242H17.154C17.9819 12.5419 18.5986 12.7269 19.0045 13.0793C19.4184 13.4316 19.5402 14.1014 19.3698 15.0881L18.5541 19.4889H16.8497L17.6288 15.2863C17.7099 14.8457 17.6856 14.533 17.5558 14.348C17.426 14.163 17.146 14.0705 16.7158 14.0705L15.3644 14.0573L14.3661 19.4889H12.6861L14.4392 10Z" fill="white"/>
+                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M6.74092 12.5243H10.0036C10.9612 12.533 11.6552 12.8327 12.0854 13.4229C12.5156 14.0132 12.6576 14.8193 12.5115 15.8414C12.4548 16.3085 12.3289 16.7665 12.1341 17.2159C11.9474 17.6652 11.6878 18.0704 11.355 18.4317C10.9491 18.8898 10.5149 19.1805 10.0523 19.304C9.58969 19.4274 9.11076 19.489 8.61575 19.489H7.15484L6.69222 22H5L6.74092 12.5243ZM7.43485 17.9956L8.16287 14.0441H8.40879C8.49815 14.0441 8.5914 14.0396 8.6888 14.0309C9.33817 14.0221 9.87774 14.0882 10.308 14.2291C10.7462 14.37 10.8923 14.9031 10.7462 15.8282C10.5678 16.9296 10.2186 17.5727 9.69926 17.7577C9.1799 17.934 8.53053 18.0176 7.75138 18.0088H7.58094C7.53224 18.0088 7.48355 18.0043 7.43485 17.9956Z" fill="white"/>
+                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M24.4365 12.5243H21.1738L19.4329 22H21.1251L21.5878 19.489H23.0487C23.5437 19.489 24.0226 19.4274 24.4852 19.304C24.9479 19.1805 25.382 18.8898 25.7879 18.4317C26.1207 18.0704 26.3803 17.6652 26.567 17.2159C26.7618 16.7665 26.8877 16.3085 26.9444 15.8414C27.0905 14.8193 26.9486 14.0132 26.5183 13.4229C26.0881 12.8327 25.3942 12.533 24.4365 12.5243ZM22.5958 14.0441L21.8678 17.9956C21.9165 18.0043 21.9652 18.0088 22.0139 18.0088H22.1843C22.9635 18.0176 23.6128 17.934 24.1322 17.7577C24.6515 17.5727 25.0007 16.9296 25.1792 15.8282C25.3253 14.9031 25.1792 14.37 24.7409 14.2291C24.3107 14.0882 23.7711 14.0221 23.1217 14.0309C23.0243 14.0396 22.9311 14.0441 22.8417 14.0441H22.5958Z" fill="white"/>
+                                 </svg>
+                             </div>
+                             <div>
+                                 <p class="font-semibold text-gray-900 dark:text-white">PHP</p>
+                                 <p class="text-sm text-gray-600 dark:text-gray-300">Web Backend</p>
+                             </div>
+                         </div>
+
+                        <div class="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/30 rounded-lg">
+                            <div class="w-10 h-10 flex items-center justify-center bg-red-100 dark:bg-red-800 rounded-lg">
+                                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Layer_1" viewBox="0 0 511.998 511.998" xml:space="preserve">
+                                    <g>
+                                        <path style="fill:#DB380E;" d="M253.464,94.869c-23.658,16.639-50.471,35.498-64.838,66.699   c-24.954,54.435,51.062,113.812,54.311,116.313c0.755,0.581,1.659,0.871,2.56,0.871c0.957,0,1.915-0.327,2.693-0.979   c1.509-1.262,1.937-3.406,1.031-5.152c-0.275-0.53-27.561-53.53-26.547-91.552c0.359-13.243,18.892-28.266,38.512-44.171   c17.97-14.568,38.34-31.079,50.258-50.394c26.164-42.516-2.916-84.322-3.213-84.74c-1.155-1.622-3.287-2.209-5.11-1.41   c-1.821,0.804-2.83,2.773-2.414,4.72c0.059,0.277,5.714,27.923-10.022,56.406C284.203,73.25,269.959,83.268,253.464,94.869z"/>
+                                        <path style="fill:#DB380E;" d="M353.137,113.617c1.669-1.257,2.159-3.55,1.15-5.38c-1.011-1.83-3.211-2.637-5.165-1.895   c-4.019,1.528-98.416,37.915-98.416,81.88c0,30.307,12.946,46.317,22.399,58.009c3.708,4.586,6.909,8.546,7.964,11.927   c2.97,9.743-4.066,27.353-7.025,33.317c-0.853,1.714-0.435,3.792,1.016,5.044c0.784,0.677,1.763,1.021,2.743,1.021   c0.834,0,1.672-0.248,2.396-0.752c1.623-1.128,39.667-28.026,32.844-60.433c-2.542-12.318-8.595-21.318-13.936-29.26   c-8.274-12.305-14.25-21.193-5.184-37.609C304.545,150.338,352.65,113.981,353.137,113.617z"/>
+                                    </g>
+                                    <g>
+                                        <path style="fill:#73A1FB;" d="M107.418,298.236c-1.618,4.845-0.854,9.651,2.207,13.903c10.233,14.207,46.48,22.029,102.068,22.029   c0.003,0,0.005,0,0.007,0c7.532,0,15.484-0.148,23.629-0.44c88.875-3.181,121.839-30.869,123.199-32.046   c1.482-1.283,1.878-3.419,0.957-5.147c-0.922-1.727-2.909-2.595-4.808-2.072c-31.301,8.546-89.748,11.58-130.288,11.58   c-45.363,0-68.465-3.268-74.121-5.681c2.902-3.985,20.802-11.101,42.983-15.464c2.12-0.416,3.577-2.374,3.367-4.524   s-2.016-3.79-4.177-3.79C179.439,276.584,114.234,277.628,107.418,298.236z"/>
+                                        <path style="fill:#73A1FB;" d="M404.812,269.718c-18.331,0-35.714,9.188-36.446,9.577c-1.695,0.908-2.555,2.852-2.09,4.72   c0.467,1.865,2.144,3.176,4.067,3.178c0.389,0,39.102,0.317,42.608,22.436c3.106,19.082-36.629,50-52.202,60.304   c-1.682,1.113-2.335,3.263-1.554,5.123c0.665,1.583,2.206,2.573,3.868,2.573c0.29,0,0.584-0.03,0.876-0.092   c3.696-0.791,90.406-19.899,81.238-70.384C439.584,276.213,420.138,269.718,404.812,269.718z"/>
+                                        <path style="fill:#73A1FB;" d="M345.347,363.755c0.302-1.617-0.371-3.262-1.717-4.207l-20.791-14.563   c-1.014-0.71-2.295-0.933-3.485-0.618c-0.217,0.055-21.959,5.771-53.525,9.276c-12.528,1.405-26.56,2.147-40.582,2.147   c-31.558,0-52.192-3.708-55.197-6.428c-0.398-0.764-0.272-1.111-0.201-1.304c0.546-1.518,3.472-3.322,5.358-4.036   c2.083-0.771,3.206-3.033,2.558-5.157c-0.646-2.127-2.837-3.378-4.999-2.859c-20.856,5.033-31.054,12.071-30.312,20.918   c1.318,15.686,37.65,23.737,68.365,25.865c4.417,0.302,9.194,0.455,14.195,0.455c0.003,0,0.005,0,0.008,0   c51.074,0,116.55-16.025,117.204-16.188C343.825,366.666,345.044,365.375,345.347,363.755z"/>
+                                        <path style="fill:#73A1FB;" d="M188.602,397.419c1.575-1.024,2.273-2.971,1.714-4.764c-0.557-1.793-2.234-2.971-4.118-2.946   c-2.795,0.074-27.349,1.182-29.068,16.815c-0.52,4.672,0.818,8.941,3.979,12.686c8.816,10.448,32.614,16.658,72.741,18.984   c4.747,0.285,9.569,0.428,14.334,0.428c51.015,0,85.373-15.973,86.812-16.653c1.395-0.66,2.315-2.031,2.397-3.571   s-0.687-3.001-2.003-3.806l-26.275-16.04c-0.912-0.556-2.003-0.74-3.043-0.527c-0.166,0.035-16.849,3.495-42.026,6.913   c-4.764,0.648-10.73,0.977-17.73,0.977c-25.15,0-53.124-4.109-58.489-6.8C187.749,398.613,187.848,397.975,188.602,397.419z"/>
+                                        <path style="fill:#73A1FB;" d="M224.408,486.85c116.854-0.099,179.571-20.88,191.653-33.957c4.277-4.626,4.739-9.006,4.376-11.867   c-0.898-7.04-7.311-11.35-8.038-11.818c-1.754-1.128-4.108-0.833-5.476,0.745c-1.365,1.578-1.397,3.884-0.027,5.461   c0.737,0.948,1.163,2.535-0.992,4.692c-4.83,4.511-53.545,18.204-134.656,22.318c-11.111,0.577-22.765,0.871-34.636,0.873   c-72.623,0-125.772-9.948-132.749-15.744c2.689-3.864,21.489-10.037,41.482-13.529c2.253-0.393,3.775-2.516,3.426-4.776   c-0.349-2.259-2.432-3.814-4.709-3.519c-0.564,0.077-2.478,0.191-4.694,0.327c-32.988,2.014-71.109,6.503-73.098,23.5   c-0.604,5.179,0.935,9.881,4.576,13.973c8.909,10.01,34.516,23.319,153.558,23.319C224.406,486.85,224.406,486.85,224.408,486.85z"/>
+                                        <path style="fill:#73A1FB;" d="M439.013,456.578c-1.652-0.764-3.604-0.378-4.836,0.952c-0.171,0.185-17.74,18.556-70.564,29.344   c-20.223,4.052-58.183,6.107-112.826,6.107c-54.745,0-106.838-2.154-107.357-2.176c-2.176-0.106-4.037,1.476-4.333,3.618   c-0.297,2.14,1.083,4.158,3.184,4.658c0.542,0.128,55.135,12.918,129.779,12.918c35.801,0,70.639-2.907,103.548-8.645   c61.361-10.757,65.657-41.183,65.81-42.473C441.632,459.078,440.662,457.342,439.013,456.578z"/>
+                                    </g>
+                                    </svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-900 dark:text-white">Java</p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">Android & Desktop</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Технологии и инструменты -->
+                <div>
+                    <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Технологии и инструменты</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <!-- Фреймворки -->
+                        <span class="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-lg font-medium">Laravel</span>
+                        <span class="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg font-medium">React</span>
+                        <span class="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-lg font-medium">Vue</span>
+                        <span class="px-4 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg font-medium">Ajax</span>
+                        <span class="px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 rounded-lg font-medium">Bootstrap</span>
+                        <span class="px-4 py-2 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 rounded-lg font-medium">Tailwind CSS</span>
+                        <!-- Остальные технологии -->
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Unity</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Unreal Engine</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">React</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">.NET</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">PostgreSQL</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">MySQL</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Git</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">GitHub</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Command Line</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">PhoneGap</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">SiGame</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">OBS</span>
+                    </div>
+                </div>
+
+                <!-- Дизайн и офисные программы -->
+                <div>
+                    <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Дизайн и офисные программы</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Photoshop</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Paint Tool SAI</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Canva</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Microsoft Word</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">PowerPoint</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">Excel (включая формулы)</span>
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium">PowerDesigner</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Дополнительная информация -->
+        <div class="relative p-6 bg-white dark:bg-gray-800/90 rounded-3xl shadow-xl mt-2">
+            <!-- Образование -->
+            <div class="mb-6">
+                <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Образование</h2>
+                <div class="relative ml-3 border-l-2 border-blue-500 dark:border-blue-400">
+                    <div>
+                        <!-- Высшее образование -->
+                        <div class="mb-8 ml-6">
+                            <span class="absolute w-3 h-3 bg-blue-500 rounded-full mt-1.5 -left-[6.5px] border-2 border-white dark:border-gray-800"></span>
+                            <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:translate-x-1 transition-transform">
+                                <time class="mb-1 text-sm font-normal leading-none text-gray-500 dark:text-gray-400">2021-2025</time>
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-2">Высшее образование (Бакалавр)</h3>
+                                <p class="mb-1 text-base font-normal text-gray-600 dark:text-white">Северо-Восточный федеральный университет им. М.К. Аммосова, Якутск</p>
+                                <p class="text-base font-normal text-gray-600 dark:text-white">Институт математики и информатики</p>
+                                <p class="text-base font-normal text-gray-600 dark:text-white">Направление: Фундаментальная информатика и информационные технологии</p>
+                                <ul class="mt-2 text-gray-600 dark:text-gray-300 list-disc ml-4">
+                                    <li>Ещё работал в разных компаниях</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- Старшая школа -->
+                        <div class="mb-8 ml-6">
+                            <span class="absolute w-3 h-3 bg-blue-500 rounded-full mt-1.5 -left-[6.5px] border-2 border-white dark:border-gray-800"></span>
+                            <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:translate-x-1 transition-transform">
+                                <time class="mb-1 text-sm font-normal leading-none text-gray-500 dark:text-gray-400">2019-2021</time>
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-2">Старшая школа</h3>
+                                <p class="text-base font-normal text-gray-600 dark:text-white">Республиканский лицей-интернат, г. Якутск</p>
+                                <p class="text-base font-normal text-gray-600 dark:text-white">Технический профиль</p>
+                                <ul class="mt-2 text-gray-600 dark:text-gray-300 list-disc ml-4">
+                                    <li>Участие в олимпиадах по программированию (Хакатоны)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- Средняя школа -->
+                        <div class="mb-8 ml-6">
+                            <span class="absolute w-3 h-3 bg-blue-500 rounded-full mt-1.5 -left-[6.5px] border-2 border-white dark:border-gray-800"></span>
+                            <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:translate-x-1 transition-transform">
+                                <time class="mb-1 text-sm font-normal leading-none text-gray-500 dark:text-gray-400">2014-2019</time>
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-2">Средняя школа</h3>
+                                <p class="text-base font-normal text-gray-600 dark:text-white">Средняя общеобразовательная школа №12, г. Якутск</p>
+                                <p class="text-base font-normal text-gray-600 dark:text-white">Физико-математический профиль</p>
+                                <ul class="mt-2 text-gray-600 dark:text-gray-300 list-disc ml-4">
+                                    <li>Участие в олимпиадах по программированию (Хакатоны)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- Начальная школа -->
+                        <div class="ml-6">
+                            <span class="absolute w-3 h-3 bg-blue-500 rounded-full mt-1.5 -left-[6.5px] border-2 border-white dark:border-gray-800"></span>
+                            <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:translate-x-1 transition-transform">
+                                <time class="mb-1 text-sm font-normal leading-none text-gray-500 dark:text-gray-400">2010-2014</time>
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-2">Начальная школа</h3>
+                                <p class="text-base font-normal text-gray-600 dark:text-white">Средняя общеобразовательная школа №17, г. Якутск</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Опыт работы -->
+            <div>
+                <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Опыт работы</h2>
+                <p class="text-base font-semibold text-gray-800 dark:text-white mb-6">Общий опыт работы: 2 года 8 месяцев</p>
+                <div class="relative ml-3 before:absolute before:left-0 before:top-0 before:w-0.5 before:h-full before:bg-gradient-to-b before:from-blue-500 before:to-indigo-500">
+                    <!-- Додо Пицца -->
+                    <div class="mb-8 ml-6">
+                        <span class="absolute w-3 h-3 bg-blue-500 rounded-full mt-1.5 -left-[5px] border-2 border-white dark:border-gray-800"></span>
+                        <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:translate-x-1 transition-transform">
+                            <div class="flex items-start">
+                                <img src="../public/assets/dodo-pizza.svg" alt="Додо Пицца" class="w-12 h-12 rounded-lg mr-4 object-contain bg-white p-1">
+                                <div>
+                                    <time class="mb-1 text-sm font-normal leading-none text-gray-500 dark:text-gray-400">Июль 2024 — Декабрь 2024 (6 месяцев)</time>
+                                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-2">Додо Пицца</h3>
+                                    <p class="text-base text-gray-600 dark:text-white">Пиццамейкер Додо</p>
+                                    <ul class="mt-2 text-gray-600 dark:text-gray-300 list-disc ml-4">
+                                        <li>Приготовление пиццы по стандартам компании</li>
+                                        <li>Работа в команде и обучение новых сотрудников</li>
+                                        <li>Контроль качества продукции</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- АлмазЭргиэнБанк -->
+                    <div class="mb-8 ml-6">
+                        <span class="absolute w-3 h-3 bg-blue-500 rounded-full mt-1.5 -left-[5px] border-2 border-white dark:border-gray-800"></span>
+                        <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:translate-x-1 transition-transform">
+                            <div class="flex items-start">
+                                <img src="../public/assets/aeb.svg" alt="АлмазЭргиэнБанк" class="w-12 h-12 rounded-lg mr-4 object-contain bg-white p-1">
+                                <div>
+                                    <time class="mb-1 text-sm font-normal leading-none text-gray-500 dark:text-gray-400">Июнь 2024 — Июль 2024 (2 месяца)</time>
+                                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-2">АлмазЭргиэнБанк</h3>
+                                    <p class="text-base text-gray-600 dark:text-white">Программист (Летняя практика)</p>
+                                    <ul class="mt-2 text-gray-600 dark:text-gray-300 list-disc ml-4">
+                                        <li>Разработка программы</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IT школа Алтан -->
+                    <div class="mb-8 ml-6">
+                        <span class="absolute w-3 h-3 bg-blue-500 rounded-full mt-1.5 -left-[5px] border-2 border-white dark:border-gray-800"></span>
+                        <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:translate-x-1 transition-transform">
+                            <div class="flex items-start">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 55" fill="none" 
+                                class="w-12 h-12 rounded-lg mr-4 p-1 text-[#6524FF] dark:text-white"
+                                >
+                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M137.411 31.7534C135.925 31.7534 134.747 32.8728 134.747 34.2561V52.0707C134.747 53.454 135.925 54.5737 137.411 54.5737C138.897 54.5737 140.075 53.454 140.075 52.0707V34.2561C140.075 32.8728 138.897 31.7534 137.411 31.7534ZM39.6122 51.9909C40.3854 51.1121 40.772 50.0634 40.772 48.845C40.772 47.9062 40.5358 47.0772 40.0632 46.3581C39.6122 45.6391 38.8175 45.0598 37.6792 44.6204C36.5409 44.1609 34.9837 43.8513 33.0078 43.6915L28.5619 43.362C27.3376 43.2621 26.5 43.0923 26.049 42.8526C25.5979 42.5929 25.3724 42.2634 25.3724 41.8639C25.3724 41.2846 25.7375 40.8552 26.4678 40.5755C27.198 40.2759 28.2397 40.1261 29.5928 40.1261C30.7956 40.1261 31.7728 40.2459 32.5245 40.4856C33.2763 40.7253 33.8454 41.0349 34.232 41.4145C34.8472 41.9565 35.5617 42.583 36.3815 42.583H37.2844C38.973 42.583 40.2675 41.0042 39.1002 39.7841C39.0169 39.6971 38.9298 39.6113 38.839 39.5269C37.9155 38.648 36.6805 37.9589 35.1341 37.4595C33.5877 36.9601 31.8265 36.7105 29.8505 36.7105C27.9175 36.7105 26.21 36.9202 24.7281 37.3397C23.2676 37.7591 22.1293 38.3783 21.3131 39.1973C20.4969 40.0162 20.0889 41.0349 20.0889 42.2534C20.0889 43.1323 20.3359 43.9412 20.8299 44.6803C21.3453 45.3994 22.2044 45.9986 23.4072 46.478C24.6099 46.9574 26.2315 47.277 28.2719 47.4368L31.6869 47.6765C33.1474 47.7963 34.1461 47.9761 34.683 48.2158C35.2415 48.4555 35.5207 48.805 35.5207 49.2644C35.5207 49.9036 35.1233 50.383 34.3287 50.7026C33.5555 51.0222 32.4064 51.182 30.8815 51.182C29.7861 51.182 28.8196 51.0721 27.982 50.8524C27.1658 50.6327 26.5 50.3231 25.9845 49.9236C25.9238 49.8742 25.8626 49.824 25.801 49.7733L25.7996 49.7723L25.7984 49.7712L25.7978 49.7707C25.0343 49.144 24.1956 48.4555 23.2267 48.4555H22.6611C20.9649 48.4555 19.5824 49.998 20.6553 51.3118C20.7692 51.4513 20.8919 51.5878 21.0232 51.7213C21.9467 52.6601 23.2354 53.3892 24.8892 53.9085C26.543 54.4079 28.4867 54.6575 30.7204 54.6575C32.8897 54.6575 34.726 54.4378 36.2295 53.9984C37.7329 53.539 38.8605 52.8698 39.6122 51.9909ZM121.936 54.6575C119.659 54.6575 117.662 54.288 115.943 53.5489C114.225 52.7899 112.883 51.7413 111.916 50.403C110.95 49.0447 110.467 47.4767 110.467 45.699C110.467 43.9013 110.95 42.3333 111.916 40.995C112.883 39.6367 114.225 38.5881 115.943 37.849C117.662 37.09 119.659 36.7105 121.936 36.7105C124.212 36.7105 126.21 37.09 127.928 37.849C129.646 38.5881 130.978 39.6367 131.923 40.995C132.889 42.3333 133.373 43.9013 133.373 45.699C133.373 47.4767 132.889 49.0447 131.923 50.403C130.978 51.7413 129.646 52.7899 127.928 53.5489C126.21 54.288 124.212 54.6575 121.936 54.6575ZM121.936 50.8524C123.181 50.8524 124.245 50.6427 125.125 50.2232C126.027 49.8037 126.715 49.2145 127.187 48.4555C127.681 47.6765 127.928 46.7576 127.928 45.699C127.928 44.6204 127.681 43.7015 127.187 42.9425C126.715 42.1635 126.027 41.5643 125.125 41.1448C124.245 40.7253 123.181 40.5156 121.936 40.5156C120.712 40.5156 119.648 40.7253 118.746 41.1448C117.844 41.5643 117.146 42.1635 116.652 42.9425C116.18 43.7015 115.943 44.6204 115.943 45.699C115.943 46.7576 116.18 47.6765 116.652 48.4555C117.146 49.2145 117.844 49.8037 118.746 50.2232C119.648 50.6427 120.712 50.8524 121.936 50.8524ZM91.9881 53.5489C93.7063 54.288 95.7038 54.6575 97.9804 54.6575C100.257 54.6575 102.255 54.288 103.973 53.5489C105.691 52.7899 107.023 51.7413 107.968 50.403C108.934 49.0447 109.417 47.4767 109.417 45.699C109.417 43.9013 108.934 42.3333 107.968 40.995C107.023 39.6367 105.691 38.5881 103.973 37.849C102.255 37.09 100.257 36.7105 97.9804 36.7105C95.7038 36.7105 93.7063 37.09 91.9881 37.849C90.2699 38.5881 88.9275 39.6367 87.961 40.995C86.9945 42.3333 86.5113 43.9013 86.5113 45.699C86.5113 47.4767 86.9945 49.0447 87.961 50.403C88.9275 51.7413 90.2699 52.7899 91.9881 53.5489ZM101.17 50.2232C100.289 50.6427 99.2261 50.8524 97.9804 50.8524C96.7562 50.8524 95.693 50.6427 94.791 50.2232C93.8889 49.8037 93.1909 49.2145 92.6969 48.4555C92.2243 47.6765 91.9881 46.7576 91.9881 45.699C91.9881 44.6204 92.2243 43.7015 92.6969 42.9425C93.1909 42.1635 93.8889 41.5643 94.791 41.1448C95.693 40.7253 96.7562 40.5156 97.9804 40.5156C99.2261 40.5156 100.289 40.7253 101.17 41.1448C102.072 41.5643 102.759 42.1635 103.232 42.9425C103.726 43.7015 103.973 44.6204 103.973 45.699C103.973 46.7576 103.726 47.6765 103.232 48.4555C102.759 49.2145 102.072 49.8037 101.17 50.2232ZM60.6259 47.257C62.3121 47.257 63.6275 48.8178 62.6922 50.2209C62.4844 50.5326 62.2501 50.833 61.9893 51.122C61.0013 52.2406 59.7233 53.1095 58.1555 53.7287C56.5876 54.3479 54.8371 54.6575 52.9041 54.6575C50.7134 54.6575 48.7804 54.288 47.1051 53.5489C45.4513 52.7899 44.1519 51.7313 43.2069 50.373C42.2833 49.0147 41.8216 47.4567 41.8216 45.699C41.8216 43.9212 42.2833 42.3632 43.2069 41.0249C44.1519 39.6667 45.4513 38.608 47.1051 37.849C48.7804 37.09 50.7134 36.7105 52.9041 36.7105C54.8371 36.7105 56.5876 37.0301 58.1555 37.6692C59.7233 38.2884 61.0013 39.1573 61.9893 40.2759C62.2528 40.5627 62.4892 40.8624 62.6986 41.1751C63.6375 42.5771 62.3133 44.141 60.6259 44.141C59.3468 44.141 58.3153 43.1683 57.445 42.2309C57.1796 41.9452 56.8688 41.693 56.5124 41.4744C55.5244 40.8352 54.3217 40.5156 52.9041 40.5156C51.7658 40.5156 50.7671 40.7253 49.908 41.1448C49.0703 41.5443 48.426 42.1335 47.975 42.9125C47.5239 43.6716 47.2984 44.6004 47.2984 45.699C47.2984 46.7776 47.5239 47.7064 47.975 48.4854C48.426 49.2444 49.0703 49.8337 49.908 50.2532C50.7671 50.6526 51.7658 50.8524 52.9041 50.8524C54.3431 50.8524 55.5566 50.5228 56.5446 49.8637C56.875 49.6479 57.1652 49.4097 57.4151 49.149C58.2998 48.2259 59.3474 47.257 60.6259 47.257ZM65.4782 34.2561C65.4782 32.8728 66.6567 31.7534 68.1424 31.7534C69.6281 31.7534 70.8066 32.8728 70.8066 34.2561V43.3716L70.8068 42.1415L70.8072 39.6901C70.8072 39.194 72.1384 36.7136 76.6674 36.7136C81.1964 36.7136 84.6606 39.9382 84.6606 43.4225V49.6236L84.6603 49.6441V52.0928C84.6603 53.476 83.4818 54.5957 81.9961 54.5957C80.5104 54.5957 79.332 53.476 79.332 52.0928V46.1623C79.332 46.1084 79.3338 46.0548 79.3373 46.0017C79.3101 43.9874 78.7148 40.6939 75.342 40.6939C71.8991 40.6939 70.8165 43.8779 70.8066 46.1226V52.0707C70.8066 53.454 69.6281 54.5737 68.1424 54.5737C66.6567 54.5737 65.4782 53.454 65.4782 52.0707V34.2561Z" fill="currentColor"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M45.024 3.7802C45.024 1.69245 43.0644 0 40.6471 0C38.2298 0 36.2701 1.69245 36.2701 3.7802V15.066C36.2701 21.8739 42.6602 27.3927 50.5427 27.3927H60.9246C63.0733 27.3927 64.8152 25.8883 64.8152 24.0326C64.8152 22.1768 63.0733 20.6724 60.9246 20.6724H52.6039C47.1387 20.6724 45.024 18.9977 45.024 13.0628V3.7802ZM13.8782 19.1428C13.8782 20.8271 15.2437 22.1925 16.928 22.1925H23.369C23.593 22.1925 23.8114 22.1683 24.0216 22.1225L25.4557 25.2097C26.091 26.5772 27.4618 27.4519 28.9696 27.4519C31.8347 27.4519 33.7087 24.4497 32.4504 21.8757L24.1391 4.8751C22.6983 1.92799 19.7044 0.0591558 16.424 0.0591558C13.1435 0.0591558 10.1497 1.92799 8.7089 4.87509L0.398741 21.8734C-0.860158 24.4485 1.01467 27.4519 3.88098 27.4519C5.38753 27.4519 6.7576 26.579 7.39412 25.2135L16.4416 5.80503L21.2207 16.093H16.928C15.2436 16.093 13.8782 17.4584 13.8782 19.1428ZM71.6059 6.77951C71.568 7.00305 71.5483 7.23278 71.5483 7.46712V23.3676C71.5483 25.6233 73.3769 27.4519 75.6326 27.4519C77.8883 27.4519 79.7169 25.6233 79.7169 23.3676V7.46711C79.7169 7.23278 79.6972 7.00305 79.6593 6.77951H87.5886C89.4444 6.77951 90.9488 5.27511 90.9488 3.41933C90.9488 1.56356 89.4444 0.0591558 87.5886 0.0591558H63.6766C61.8209 0.0591558 60.3165 1.56356 60.3165 3.41933C60.3165 5.27511 61.8209 6.77951 63.6766 6.77951H71.6059ZM98.5243 22.1925C98.4049 22.1925 98.2871 22.1856 98.1713 22.1723L96.7537 25.2135C96.1171 26.579 94.7471 27.4519 93.2405 27.4519C90.3742 27.4519 88.4994 24.4484 89.7583 21.8734L98.0684 4.87509C99.5092 1.92799 102.503 0.0591558 105.784 0.0591558C109.064 0.0591558 112.058 1.92799 113.499 4.8751L121.81 21.8757C123.068 24.4497 121.194 27.4519 118.329 27.4519C116.821 27.4519 115.45 26.5772 114.815 25.2097L113.381 22.1225C113.171 22.1683 112.953 22.1925 112.729 22.1925H98.5243ZM105.801 5.80504L110.58 16.093H101.005L105.801 5.80504ZM152.106 18.8441V4.00601C152.106 1.82622 153.873 0.0591558 156.053 0.0591558C158.233 0.0591558 160 1.82622 160 4.006V20.6102C160 24.3888 156.937 27.4519 153.158 27.4519C151.012 27.4519 148.99 26.4446 147.697 24.7313L135.219 8.19559V23.505C135.219 25.6848 133.452 27.4519 131.272 27.4519C129.093 27.4519 127.326 25.6848 127.326 23.505V7.09237C127.326 3.20803 130.474 0.0591558 134.359 0.0591558C136.559 0.0591558 138.632 1.08834 139.961 2.84061L152.106 18.8441Z" fill="currentColor"></path>
+                            </svg>
+                            <div>
+                                <time class="mb-1 text-sm font-normal leading-none text-gray-500 dark:text-gray-400">Август 2022 — Май 2024 (1 год 10 месяцев)</time>
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-2">IT школа Алтан</h3>
+                                <p class="text-base text-gray-600 dark:text-white">Учитель Unity и Unreal Engine</p>
+                                <ul class="mt-2 text-gray-600 dark:text-gray-300 list-disc ml-4">
+                                    <li>Обучение детей разработке игр на Unity и Unreal Engine</li>
+                                    <li>Разработка учебных материалов и программ</li>
+                                    <li>Проведение мастер-классов и воркшопов</li>
+                                </ul>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MyTona -->
+                    <div class="ml-6">
+                        <span class="absolute w-3 h-3 bg-blue-500 rounded-full mt-1.5 -left-[5px] border-2 border-white dark:border-gray-800"></span>
+                        <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:translate-x-1 transition-transform">
+                            <div class="flex items-start">
+                                <img src="../public/assets/mytona.svg" alt="MyTona" class="w-12 h-12 rounded-lg mr-4 object-contain bg-white p-1">
+                                <div>
+                                    <time class="mb-1 text-sm font-normal leading-none text-gray-500 dark:text-gray-400">Июль 2018 — Август 2018 (2 месяца)</time>
+                                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-2">MyTona</h3>
+                                    <p class="text-base text-gray-600 dark:text-white">Unity разработчик (Стажировка)</p>
+                                    <ul class="mt-2 text-gray-600 dark:text-gray-300 list-disc ml-4">
+                                        <li>Разработка RPG игры про рыцарей на Unity</li>
+                                        <li>Работа в команде над игровыми механиками</li>
+                                        <li>Изучение основ геймдизайна</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Раздел статьи -->
+        <div class="bg-white mt-2 dark:bg-gray-700/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all">
+            <h2 class="text-2xl font-extrabold mb-6 text-gray-800 dark:text-white">Последняя статья</h2>
+            <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Обзор: Сядь за руль моей машины</h3>
+            <p class="text-gray-600 dark:text-white mb-4">
+                Сюжет фильма меня сильно затронул и дал подумать о своей жизни, из-за того, что показаны разные остросоциальные проблемы современного общества, точнее японского общества и о её переживаниях.
+            </p>
+            <div class="relative h-64 rounded-lg overflow-hidden">
+                <img 
+                    src="../public/assets/long_1_1.jpg" 
+                    alt="Кадр фильма" 
+                    class="w-full h-full object-cover"
+                />
+                <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+            </div>
+            <div class="mt-4 flex justify-between items-center">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Опубликовано: 8 апреля 2022</span>
+                <button 
+                    onclick="showLong('drive-my-car')" 
+                    class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                >
+                    <span>Читать статью</span>
+                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Раздел проектов -->
+        <div class="bg-white mt-2 dark:bg-gray-700/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all">
+            <h2 class="text-2xl font-extrabold mb-6 text-gray-800 dark:text-white">Мои проекты</h2>
+            <div class="grid gap-4">
+                <!-- Находчивая женщина -->
+                <button onclick="showProject('finding-woman')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/1.png" alt="Находчивая женщина" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Находчивая женщина</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- ЖИПТО -->
+                <button onclick="showProject('jipto')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/2.png" alt="ЖИПТО" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">ЖИПТО</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- HappyParent -->
+                <button onclick="showProject('happy-parent')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/7.jpg" alt="HappyParent" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">HappyParent</span>
+                        <span class="px-2 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-sm inline-flex w-fit">Мобильное приложение</span>
+                    </div>
+                </button>
+
+                <!-- Salemart -->
+                <button onclick="showProject('salemart')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/6.png" alt="Salemart" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Salemart</span>
+                        <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-sm inline-flex w-fit">Веб-сайт</span>
+                    </div>
+                </button>
+
+                <!-- Менеджер спортивных мероприятий -->
+                <button onclick="showProject('sports-manager')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/15.png" alt="Менеджер спортивных мероприятий" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Менеджер спортивных мероприятий</span>
+                        <span class="px-2 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-sm inline-flex w-fit">Приложение</span>
+                    </div>
+                </button>
+
+                <!-- Поиск предметов в мире Гравити Фолз -->
+                <button onclick="showProject('gravity-falls')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/11.png" alt="Поиск предметов в мире Гравити Фолз" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Поиск предметов в мире Гравити Фолз</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- Quest Platformer -->
+                <button onclick="showProject('quest-platformer')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/8.png" alt="2D квест-платформер" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">2D квест-платформер</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- AIFHOC -->
+                <button onclick="showProject('aifhoc')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/20.jpg" alt="AIFHOC" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">AIFHOC</span>
+                        <span class="px-2 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-sm inline-flex w-fit">Приложение</span>
+                    </div>
+                </button>
+
+                <!-- MyTona Game -->
+                <button onclick="showProject('mytona-game')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/18.jpg" alt="Игра во время стажировки в MYTONA" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Игра во время стажировки в MYTONA</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- Damn Terrarium -->
+                <button onclick="showProject('damn-terrarium')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/5.jpg" alt="Damn Terrarium" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Damn Terrarium</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- GO HELP -->
+                <button onclick="showProject('go-help')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/9.jpg" alt="GO HELP" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">GO HELP</span>
+                        <span class="px-2 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-sm inline-flex w-fit">Приложение</span>
+                    </div>
+                </button>
+
+                <!-- Legend of Office -->
+                <button onclick="showProject('legend-of-office')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/3.png" alt="Legend of Office" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Legend of Office</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- The Companions -->
+                <button onclick="showProject('the-companions')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/10.jpg" alt="The Companions" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">The Companions</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- IT Specialist -->
+                <button onclick="showProject('it-specialist')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/19.jpg" alt="Айтишник" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Айтишник</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- First Shooter -->
+                <button onclick="showProject('first-shooter')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/17.webp" alt="Мой первый шутер на Unity" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Мой первый шутер на Unity</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- Steins Gate -->
+                <button onclick="showProject('steins-gate')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/16.gif" alt="Поймать вещи в антураже Steins;Gate" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Поймать вещи в антураже Steins;Gate</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- China Adventure -->
+                <button onclick="showProject('china-adventure')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/13.png" alt="Приключения в Китае" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Приключения в Китае</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+
+                <!-- Movie Site -->
+                <button onclick="showProject('movie-site')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/15.png" alt="Сайт кинолент" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Сайт кинолент</span>
+                        <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-sm inline-flex w-fit">Веб-сайт</span>
+                    </div>
+                </button>
+
+                <!-- Jojo Fighting -->
+                <button onclick="showProject('jojo-fighting')" class="flex items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:translate-x-1 transition-all text-left">
+                    <img src="../public/assets/12.webp" alt="Файтинг Джоджо" class="w-12 h-12 rounded-lg mr-4 object-cover">
+                    <div class="flex flex-col gap-2">
+                        <span class="text-lg font-medium text-gray-800 dark:text-white">Файтинг Джоджо</span>
+                        <span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-sm inline-flex w-fit">Игра</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Модальное окно для просмотра проекта -->
+        <div id="projectModal" class="fixed inset-0 bg-black/50 hidden z-50">
+            <div class="fixed inset-0 md:inset-10 bg-white dark:bg-gray-800 md:rounded-xl overflow-auto flex flex-col">
+                <div class="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center z-10">
+                    <div class="flex items-center">
+                        <img id="projectIcon" src="" alt="" class="w-8 h-8 rounded-lg mr-3 object-cover">
+                    </div>
+                    <button onclick="closeProject()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-4 md:p-6 flex-1 overflow-auto">
+                    <div class="w-full md:max-w-3xl mx-auto">
+                        <div id="projectContent" class="prose dark:prose-invert max-w-none"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module">
+        import { projectsData, longsData } from './data/projects.js';
+
+        async function copyToClipboard(text, message) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const notification = document.getElementById('notification');
+                const notificationText = document.getElementById('notification-text');
+                notificationText.textContent = message;
+                
+                // Показываем уведомление
+                notification.classList.remove('opacity-0');
+                notification.classList.add('translate-y-4');
+                
+                // Скрываем через 2 секунды
+                setTimeout(() => {
+                    notification.classList.add('opacity-0');
+                    notification.classList.remove('translate-y-4');
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                // Показываем уведомление об ошибке
+                const notification = document.getElementById('notification');
+                const notificationText = document.getElementById('notification-text');
+                notification.classList.remove('bg-green-500');
+                notification.classList.add('bg-red-500');
+                notificationText.textContent = 'Не удалось скопировать текст';
+                
+                notification.classList.remove('opacity-0');
+                notification.classList.add('translate-y-4');
+                
+                setTimeout(() => {
+                    notification.classList.add('opacity-0');
+                    notification.classList.remove('translate-y-4');
+                    // Возвращаем зеленый цвет
+                    setTimeout(() => {
+                        notification.classList.remove('bg-red-500');
+                        notification.classList.add('bg-green-500');
+                    }, 300);
+                }, 2000);
+            }
+        }
+
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark')
+                localStorage.theme = 'light'
+            } else {
+                document.documentElement.classList.add('dark')
+                localStorage.theme = 'dark'
+            }
+        }
+
+        // Функция для конвертации markdown в HTML
+        function markdownToHTML(markdown) {
+            const lines = markdown.split('\n');
+            let html = '';
+            let inList = false;
+            let metadataHtml = '<div class="grid gap-4 mb-8 text-sm">';
+            let isMetadata = true;
+            let title = '';
+            
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                
+                // Пропускаем пустые строки
+                if (!trimmedLine) {
+                    if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                    }
+                    continue;
+                }
+                
+                // Метаданные (строки с ":")
+                if (isMetadata && line.includes(': ') && !line.includes('Видео:')) {
+                    // Проверяем, является ли это первой строкой с метаданными
+                    if (metadataHtml === '<div class="grid gap-4 mb-8 text-sm">') {
+                        // Если это первая строка и она не содержит ожидаемые ключи метаданных,
+                        // считаем что метаданных нет
+                        const key = line.split(':')[0].trim();
+                        const expectedKeys = ['Тип работы', 'Роль', 'Технология', 'Особенности', 'Формат Разработки', 'Ссылка на проект'];
+                        
+                        if (!expectedKeys.includes(key)) {
+                            isMetadata = false;
+                            metadataHtml = ''; // Очищаем метаданные
+                            // Обрабатываем строку как обычный текст
+                            html += `<p class="text-gray-600 dark:text-gray-300 mb-4">${line}</p>`;
+                            continue;
+                        }
+                    }
+
+                    const [key, value] = line.split(': ').map(s => s.trim());
+                    const colorClass = {
+                        'Тип работы': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                        'Роль': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+                        'Технология': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+                        'Особенности': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+                        'Формат Разработки': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                        'Ссылка на проект': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                    }[key] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+
+                    metadataHtml += `
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-gray-600 dark:text-gray-400 min-w-[140px]">${key}:</span>
+                            ${key === 'Ссылка на проект' 
+                                ? `<a href="${value}" target="_blank" class="px-2 py-1 rounded-md ${colorClass} hover:opacity-80 transition-opacity flex items-center gap-2">
+                                    <span class="truncate max-w-[300px]">${value}</span>
+                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                 </a>`
+                                : `<span class="px-2 py-1 rounded-md ${colorClass} break-all">${value}</span>`
+                            }
+                        </div>
+                    `;
+                    continue;
+                }
+                
+                // Блоки цитат (проверяем в первую очередь)
+                if (trimmedLine.startsWith('>')) {
+                    let quoteContent = [];
+                    let currentLine = line;
+                    
+                    // Собираем все параграфы цитаты
+                    while (currentLine && !currentLine.trim().match(/^>$/)) {
+                        if (currentLine.startsWith('>')) {
+                            quoteContent.push(currentLine.slice(1).trim());
+                        } else if (currentLine.trim()) {
+                            quoteContent.push(currentLine.trim());
+                        }
+                        const nextIndex = lines.indexOf(currentLine) + 1;
+                        currentLine = lines[nextIndex];
+                        if (nextIndex < lines.length) {
+                            lines.splice(nextIndex - 1, 1);
+                        }
+                    }
+                    
+                    html += `
+                        <blockquote class="relative my-8 pl-6 py-4">
+                            <div class="absolute top-0 left-0 w-1 h-full bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                            ${quoteContent.map(text => 
+                                `<p class="text-gray-600 dark:text-gray-300 mb-4 last:mb-0">${text}</p>`
+                            ).join('')}
+                        </blockquote>
+                    `;
+                    continue;
+                }
+                
+                // Заголовок H1
+                if (trimmedLine.startsWith('# ')) {
+                    title = `<h1 class="text-4xl font-bold text-gray-800 dark:text-white mb-6">${trimmedLine.slice(2)}</h1>`;
+                    continue;
+                }
+                
+                // Заголовок H2
+                if (trimmedLine.startsWith('## ')) {
+                    isMetadata = false;
+                    html += `
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mt-8 mb-4">
+                            ${trimmedLine.slice(3)}
+                        </h2>`;
+                    continue;
+                }
+                
+                // Aside блок
+                if (line.includes('<aside>')) {
+                    const content = line.replace('<aside>', '').replace('</aside>', '');
+                    const [emoji, ...text] = content.split(' ');
+                    html += `
+                        <div class="flex items-center gap-3 p-6 my-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                            <span class="text-2xl">${emoji}</span>
+                            <div class="flex-1">
+                                <p class="text-gray-600 dark:text-gray-300">${text.join(' ')}</p>
+                            </div>
+                        </div>`;
+                    continue;
+                }
+                
+                // Изображения
+                if (trimmedLine.match(/!\[.*?\]\(.*?\)/)) {
+                    // Если это первое изображение в группе, начинаем новую сетку
+                    if (!html.endsWith('</div>')) {
+                        html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">`;
+                    }
+
+                    const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/);
+                    const imgAlt = imgMatch[1];
+                    const imgUrl = imgMatch[2];
+                    html += `
+                        <div class="group relative w-full rounded-xl overflow-hidden">
+                            <img 
+                                src="${imgUrl}" 
+                                alt="${imgAlt}" 
+                                class="w-full h-auto max-h-[500px] object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+                            />
+                            <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/5 dark:to-black/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        </div>`;
+
+                    // Если следующая строка не содержит изображение, закрываем сетку
+                    const nextLine = lines[lines.indexOf(line) + 1];
+                    if (!nextLine || !nextLine.trim().match(/!\[.*?\]\(.*?\)/)) {
+                        html += '</div>';
+                    }
+                    continue;
+                }
+                
+                // Видео
+                if (line.includes('Видео:') || (trimmedLine.startsWith('[') && line.includes('youtu'))) {
+                    isMetadata = false;
+                    const videoUrl = line.includes('Видео:') 
+                        ? line.split('Видео:')[1].trim()
+                        : line.split('](')[1].slice(0, -1);
+                    
+                    const videoId = videoUrl.includes('youtu.be/') 
+                        ? videoUrl.split('youtu.be/')[1].split('?')[0].split('&')[0]
+                        : videoUrl.split('v=')[1]?.split('&')[0]?.split('?')[0];
+                    
+                    if (videoId) {
+                        html += `
+                            <div class="relative w-full max-w-2xl mx-auto my-8">
+                                <div class="relative pt-[56.25%] rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                                    <iframe 
+                                        class="absolute inset-0 w-full h-full"
+                                        src="https://www.youtube.com/embed/${videoId}"
+                                        title="YouTube video player"
+                                        frameborder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowfullscreen
+                                    ></iframe>
+                                </div>
+                                <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/5 dark:to-white/5 pointer-events-none rounded-lg"></div>
+                            </div>`;
+                    }
+                    continue;
+                }
+                
+                // Списки
+                if (trimmedLine.startsWith('- ')) {
+                    isMetadata = false;
+                    if (!inList) {
+                        html += '<ul class="space-y-1.5 my-4">';
+                        inList = true;
+                    }
+                    // Проверяем, является ли элемент списка ссылкой
+                    if (line.match(/\[.*?\]\(.*?\)/)) {
+                        const linkText = line.match(/\[(.*?)\]/)[1];
+                        const linkUrl = line.match(/\((.*?)\)/)[1];
+                        // Проверяем, является ли файл презентацией
+                        if (linkText.endsWith('.pptx') || linkText.endsWith('.ppt')) {
+                            html += `
+                                <li class="group flex items-center gap-3 py-1 px-2 text-gray-600 dark:text-gray-300 rounded-lg">
+                                    <span class="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
+                                    <div class="flex-1">
+                                        <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                            <div class="flex-shrink-0">
+                                                <svg class="w-8 h-8 text-red-500 dark:text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M19 3H5C3.89 3 3 3.89 3 5V19C3 20.11 3.89 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.89 20.11 3 19 3M19 19H5V5H19V19M10 12H8V17H10V12M14 8H12V17H14V8M18 14H16V17H18V14Z"/>
+                                                </svg>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">${linkText}</p>
+                                                <p class="text-sm text-gray-500 dark:text-gray-300">Презентация</p>
+                                            </div>
+                                            <a href="${linkUrl}" target="_blank" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-900 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600 dark:hover:text-white transition-colors">
+                                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path>
+                                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"></path>
+                                                </svg>
+                                                Открыть
+                                            </a>
+                                        </div>
+                                    </div>
+                                </li>`;
+                        } else {
+                            html += `
+                                <li class="group flex items-center gap-3 py-1 px-2 text-gray-600 dark:text-gray-300 rounded-lg">
+                                    <span class="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
+                                    <a href="${linkUrl}" target="_blank" class="px-2 py-1 rounded-md bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:opacity-80 transition-opacity flex items-center gap-2">
+                                        <span class="truncate max-w-[300px]">${linkText}</span>
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                    </a>
+                                </li>`;
+                        }
+                    } else {
+                        html += `
+                            <li class="group flex items-center gap-3 py-1 px-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                <span class="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full group-hover:bg-gray-500 dark:group-hover:bg-gray-400"></span>
+                                ${line.slice(2)}
+                            </li>`;
+                    }
+                    continue;
+                }
+                
+                // Обычный текст (если ничего другое не подошло)
+                if (trimmedLine && 
+                    !trimmedLine.match(/!\[.*?\]\(.*?\)/) && 
+                    !trimmedLine.match(/\[.*?\]\(.*?\)/) && 
+                    !trimmedLine.includes('Видео:') &&
+                    !trimmedLine.startsWith('- ') &&
+                    !trimmedLine.startsWith('>')) {
+                    isMetadata = false;
+                    html += `<p class="text-gray-600 dark:text-gray-300 mb-4">${line}</p>`;
+                } else if (line.match(/^\[.*?\]\(.*?\)/)) {
+                    // Обработка ссылок
+                    const linkText = line.match(/\[(.*?)\]/)[1];
+                    const linkUrl = line.match(/\((.*?)\)/)[1];
+                    
+                    // Проверяем, является ли файл презентацией
+                    if (linkText.endsWith('.pptx') || linkText.endsWith('.ppt')) {
+                        html += `
+                            <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg my-4">
+                                <div class="flex-shrink-0">
+                                    <svg class="w-8 h-8 text-red-500 dark:text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M19 3H5C3.89 3 3 3.89 3 5V19C3 20.11 3.89 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.89 20.11 3 19 3M19 19H5V5H19V19M10 12H8V17H10V12M14 8H12V17H14V8M18 14H16V17H18V14Z"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">${linkText}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-300">Презентация</p>
+                                </div>
+                                <a href="${linkUrl}" target="_blank" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-900 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600 dark:hover:text-white transition-colors">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path>
+                                        <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"></path>
+                                    </svg>
+                                    Открыть
+                                </a>
+                            </div>`;
+                    }
+                    continue;
+                }
+            }
+            
+            if (inList) html += '</ul>';
+            metadataHtml += '</div>';
+            return title + metadataHtml + html;
+        }
+
+        // Функция для извлечения метаданных из markdown
+        function parseProjectMarkdown(markdown) {
+            const lines = markdown.split('\n');
+            const metadata = {};
+            let description = [];
+            let isMetadata = true;
+
+            for (const line of lines) {
+                if (line.startsWith('# ')) {
+                    metadata.title = line.slice(2);
+                }
+                else if (line.includes(': ') && isMetadata) {
+                    const [key, value] = line.split(': ');
+                    metadata[key.toLowerCase()] = value;
+                }
+                else if (line.trim() === '') {
+                    isMetadata = false;
+                }
+                else if (!isMetadata) {
+                    description.push(line);
+                }
+            }
+
+            metadata.description = description.join('\n');
+            return metadata;
+        }
+
+        async function showProject(projectId) {
+            const projectData = projectsData[projectId];
+            if (!projectData) return;
+            
+            // Загружаем markdown контент
+            const response = await fetch(projectData.markdownPath);
+            const markdown = await response.text();
+            
+            // Заполняем контент
+            document.getElementById('projectContent').innerHTML = markdownToHTML(markdown);
+            document.getElementById('projectIcon').src = projectData.icon;
+            
+            // Показываем модальное окно
+            document.getElementById('projectModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeProject() {
+            document.getElementById('projectModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        
+        // Функция для открытия статьи
+        async function showLong(longId) {
+            const longData = longsData[longId];
+            if (!longData) return;
+            
+            // Загружаем markdown контент
+            const response = await fetch(longData.markdownPath);
+            const markdown = await response.text();
+            
+            // Создаем модальное окно
+            const modalHtml = `
+                <div id="longModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                    <div class="flex items-center justify-center min-h-screen p-4">
+                        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" aria-hidden="true"></div>
+                        
+                        <div class="relative bg-white dark:bg-gray-800 rounded-xl max-w-4xl w-full p-6 overflow-hidden shadow-xl transform transition-all">
+                            <div class="absolute top-0 right-0 pt-4 pr-4">
+                                <button type="button" onclick="closeLong()" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                    <span class="sr-only">Закрыть</span>
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <div class="mt-2 prose dark:prose-invert max-w-none">
+                                ${markdownToHTML(markdown)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Функция для закрытия статьи
+        function closeLong() {
+            const modal = document.getElementById('longModal');
+            if (modal) {
+                modal.remove();
+                document.body.style.overflow = '';
+            }
+        } 
+        // Делаем функции доступными глобально
+        window.showLong = showLong;
+        window.closeLong = closeLong;
+        window.showProject = showProject;
+        window.closeProject = closeProject;
+        window.copyToClipboard = copyToClipboard;
+        window.toggleTheme = toggleTheme;
+    </script>
+</body>
+</html>
