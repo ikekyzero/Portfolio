@@ -4,7 +4,7 @@
 
 [Демо](https://ikekyzero.github.io/Portfolio/) • [Установка](#️-быстрый-старт) • [Функции](#-основные-функции) • [Технологии](#-технологии)
 
-![Demo Preview](https://ikekyzero.github.io/Portfolio/assets/readme-preview.JPG)
+![Demo Preview]([https://ikekyzero.github.io/Portfolio/assets/readme-preview.JPG](https://ikekyzero.github.io/Portfolio/src/assets/readme-preview.JPG)
 
 ---
 
